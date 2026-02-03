@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CallSage Voice Chat - Simple Implementation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .recording-controls {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .record-btn {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: none;
+            font-size: 48px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .record-btn.idle {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .record-btn.recording {
+            background: #f44336;
+            animation: pulse 1.5s infinite;
+        }
+
+        .record-btn:hover:not(:disabled) {
+            transform: scale(1.1);
+        }
+
+        .record-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 18px;
+            font-weight: 500;
+            min-height: 30px;
+        }
+
+        .transcript {
+            padding: 16px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .transcript.show {
+            display: block;
+        }
+
+        .transcript-label {
+            font-weight: bold;
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .transcript-text {
+            font-style: italic;
+            color: #333;
+        }
+
+        .response {
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            display: none;
+        }
+
+        .response.show {
+            display: block;
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 16px;
+        }
+
+        .confidence-high { background: #4caf50; }
+        .confidence-medium { background: #ff9800; }
+        .confidence-low { background: #f44336; }
+
+        .response-text {
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .error {
+            padding: 20px;
+            background: #fee;
+            border: 2px solid #fcc;
+            color: #c00;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .info {
+            background: #e3f2fd;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #1976d2;
+        }
+
+        .text-input-section {
+            border-top: 2px solid #e0e0e0;
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .send-btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 Voice Chat</h1>
+            <p>Ask questions about your insurance policy</p>
+        </div>
+
+        <div class="content">
+            <!-- Info Box -->
+            <div class="info">
+                <strong>How to use:</strong><br>
+                1. Click the microphone to start recording<br>
+                2. Speak your question<br>
+                3. Click again to stop and send<br>
+                <br>
+                Or type your question below ⬇️
+            </div>
+
+            <!-- Recording Controls -->
+            <div class="recording-controls">
+                <button id="recordBtn" class="record-btn idle">
+                    🎤
+                </button>
+            </div>
+
+            <div id="status" class="status"></div>
+
+            <!-- Error Display -->
+            <div id="error" class="error"></div>
+
+            <!-- Transcript Display -->
+            <div id="transcript" class="transcript">
+                <div class="transcript-label">You said:</div>
+                <div class="transcript-text" id="transcriptText"></div>
+            </div>
+
+            <!-- Response Display -->
+            <div id="response" class="response"></div>
+
+            <!-- Text Input (Alternative) -->
+            <div class="text-input-section">
+                <h3 style="margin-bottom: 12px;">Or type your question:</h3>
+                <div class="input-group">
+                    <input
+                        type="text"
+                        id="textInput"
+                        placeholder="What does my insurance policy cover?"
+                    />
+                    <button id="sendBtn" class="send-btn">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+
+        // State
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        let stream = null;
+
+        // Elements
+        const recordBtn = document.getElementById('recordBtn');
+        const status = document.getElementById('status');
+        const error = document.getElementById('error');
+        const transcript = document.getElementById('transcript');
+        const transcriptText = document.getElementById('transcriptText');
+        const response = document.getElementById('response');
+        const textInput = document.getElementById('textInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        // Initialize
+        async function init() {
+            // Check browser support
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showError('Your browser does not support audio recording. Please use Chrome, Firefox, or Edge.');
+                recordBtn.disabled = true;
+                return;
+            }
+
+            // Request microphone permission
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                setStatus('Ready! Click the microphone to record.');
+            } catch (err) {
+                showError('Microphone access denied. Please allow microphone access to use voice chat.');
+                recordBtn.disabled = true;
+            }
+        }
+
+        // Record button click handler
+        recordBtn.addEventListener('click', async () => {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        // Start recording
+        function startRecording() {
+            if (!stream) return;
+
+            audioChunks = [];
+            hideError();
+            hideResponse();
+            hideTranscript();
+
+            // Create MediaRecorder
+            // Try to use audio/webm first, fallback to default
+            const options = { mimeType: 'audio/webm' };
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (e) {
+                mediaRecorder = new MediaRecorder(stream);
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    audioChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                processAudioRecording();
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            recordBtn.classList.remove('idle');
+            recordBtn.classList.add('recording');
+            setStatus('🔴 Recording... Click to stop');
+        }
+
+        // Stop recording
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.classList.remove('recording');
+                recordBtn.classList.add('idle');
+                setStatus('⏳ Processing...');
+            }
+        }
+
+        // Process recorded audio
+        async function processAudioRecording() {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+
+            // Important: The backend Whisper accepts WebM!
+            // If it doesn't, you'd need to convert to MP3 here
+
+            await uploadAudio(audioBlob);
+        }
+
+        // Upload audio to API
+        async function uploadAudio(audioBlob) {
+            recordBtn.disabled = true;
+            sendBtn.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+
+                const res = await fetch(`${API_BASE_URL}/process`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+
+                const data = await res.json();
+
+                if (data.success) {
+                    displayAudioResponse(data);
+                } else {
+                    showError('Processing failed: ' + data.response);
+                }
+            } catch (err) {
+                showError('Upload failed: ' + err.message);
+            } finally {
+                recordBtn.disabled = false;
+                sendBtn.disabled = false;
+                setStatus('Ready! Click the microphone to record.');
+            }
+        }
+
+        // Text query handler
+        sendBtn.addEventListener('click', sendTextQuery);
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendTextQuery();
+        });
+
+        async function sendTextQuery() {
+            const text = textInput.value.trim();
+            if (!text) return;
+
+            recordBtn.disabled = true;
+            sendBtn.disabled = true;
+            setStatus('⏳ Processing...');
+            hideError();
+            hideResponse();
+            hideTranscript();
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+
+                const data = await res.json();
+
+                if (data.success) {
+                    displayTextResponse(data);
+                } else {
+                    showError('Query failed: ' + data.response);
+                }
+            } catch (err) {
+                showError('Request failed: ' + err.message);
+            } finally {
+                recordBtn.disabled = false;
+                sendBtn.disabled = false;
+                setStatus('Ready!');
+            }
+        }
+
+        // Display audio response (includes transcript)
+        function displayAudioResponse(data) {
+            // Show transcript
+            if (data.transcript) {
+                transcriptText.textContent = data.transcript;
+                transcript.classList.add('show');
+            }
+
+            // Show response
+            displayResponse(data);
+        }
+
+        // Display text response
+        function displayTextResponse(data) {
+            hideTranscript();
+            displayResponse(data);
+        }
+
+        // Display response (common)
+        function displayResponse(data) {
+            const confidence = data.confidence;
+            const confidenceClass = confidence > 0.85 ? 'confidence-high' :
+                                  confidence > 0.7 ? 'confidence-medium' :
+                                  'confidence-low';
+
+            let html = `
+                <div class="confidence-badge ${confidenceClass}">
+                    ${(confidence * 100).toFixed(0)}% Confidence
+                </div>
+                <span style="margin-left: 12px; color: #666; font-size: 14px;">
+                    ${data.processing_time_ms}ms
+                </span>
+                <div class="response-text">
+                    ${data.response}
+                </div>
+            `;
+
+            if (data.sources && data.sources.length > 0) {
+                html += `
+                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0;">
+                        <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">📚 Sources:</div>
+                        ${data.sources.slice(0, 3).map(source => `
+                            <div style="font-size: 12px; color: #666; margin-bottom: 4px;">
+                                ${source.document} (${(source.relevance * 100).toFixed(0)}%)
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            response.innerHTML = html;
+            response.classList.add('show');
+            setStatus('✅ Done!');
+
+            // Clear text input
+            textInput.value = '';
+        }
+
+        // UI Helpers
+        function setStatus(msg) {
+            status.textContent = msg;
+        }
+
+        function showError(msg) {
+            error.textContent = '❌ ' + msg;
+            error.classList.add('show');
+        }
+
+        function hideError() {
+            error.classList.remove('show');
+        }
+
+        function hideResponse() {
+            response.classList.remove('show');
+        }
+
+        function hideTranscript() {
+            transcript.classList.remove('show');
+        }
+
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>

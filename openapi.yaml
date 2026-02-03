@@ -1,0 +1,894 @@
+openapi: 3.0.3
+info:
+  title: CallSage IVR RAG API
+  description: |
+    **CallSage** is an Intelligent Voice Response (IVR) system powered by Retrieval-Augmented Generation (RAG).
+
+    ## Features
+
+    - 🎤 **Audio Processing**: Upload audio files for transcription and intelligent responses
+    - 💬 **Text Queries**: Direct text-based queries with RAG-powered answers
+    - 📚 **Knowledge Base**: Ingest and search documents (PDF, TXT, MD, DOCX)
+    - 🛡️ **Guardrails**: PII detection, profanity filtering, prompt injection detection
+    - 🎯 **Confidence Scoring**: Every response includes confidence metrics
+    - 📖 **Source Attribution**: Responses cite source documents with relevance scores
+
+    ## Workflow
+
+    ### Chat Flow
+    ```
+    Text Input → Input Guardrails → Vector Search → LLM Generation → Output Guardrails → Response
+    ```
+
+    ### Audio Flow
+    ```
+    Audio File → Whisper Transcription → [Same as Chat Flow] → Response
+    ```
+
+    ## Base URL
+    - Development: `http://localhost:8000`
+    - Production: Configure via environment
+
+  version: 1.0.0
+  contact:
+    name: CallSage Support
+    email: support@callsage.example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: http://localhost:8000/api/v1
+    description: Local with API versioning (future)
+
+tags:
+  - name: Health
+    description: System health and status monitoring
+  - name: Query
+    description: Process audio and text queries through the RAG pipeline
+  - name: Knowledge Base
+    description: Manage and search the document knowledge base
+  - name: Guardrails
+    description: Test input guardrails and safety checks
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: |
+        Check the health status of all system components:
+        - **Whisper**: Audio transcription service
+        - **ChromaDB**: Vector database
+        - **Ollama**: LLM inference server
+
+        Returns overall system status and individual component statuses.
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Health check successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: healthy
+                components:
+                  whisper: loaded
+                  chromadb: connected
+                  ollama: connected
+                version: "1.0.0"
+
+  /query:
+    post:
+      tags:
+        - Query
+      summary: Text query
+      description: |
+        Query the RAG system with text directly (no audio transcription).
+
+        **Pipeline:**
+        1. Apply input guardrails (PII, profanity, injection detection)
+        2. Search vector database for relevant documents
+        3. Generate response using LLM with retrieved context
+        4. Apply output guardrails (confidence checks, tone adjustment)
+        5. Return response with sources and confidence score
+
+        **Use cases:**
+        - Chat interfaces
+        - Web forms
+        - API integrations
+        - Testing RAG without audio
+      operationId: queryText
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+            example:
+              text: "What does this insurance policy cover?"
+              conversation_id: "conv-12345"
+      responses:
+        '200':
+          description: Query processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+              example:
+                success: true
+                request_id: "req-abc123"
+                response: "This insurance policy covers medical expenses including hospital stays, surgeries, emergency care, and prescriptions up to $50,000 per incident with a $500 excess..."
+                confidence: 0.87
+                sources:
+                  - document: "1Cover-AU-Standard-PDS_20250725.pdf.md"
+                    chunk_id: "1Cover-AU-Standard-PDS_20250725.pdf_0"
+                    relevance: 0.92
+                  - document: "policy-coverage.md"
+                    chunk_id: "policy-coverage_3"
+                    relevance: 0.85
+                fallback_used: false
+                processing_time_ms: 1234
+        '400':
+          description: Bad request (invalid input)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /process:
+    post:
+      tags:
+        - Query
+      summary: Process audio file
+      description: |
+        Process an audio file through the complete pipeline:
+        1. **Transcribe** audio to text using Whisper
+        2. **Apply input guardrails** (PII detection, profanity filter, etc.)
+        3. **Query RAG system** with transcribed text
+        4. **Generate response** using LLM with retrieved context
+        5. **Apply output guardrails** (confidence checks, tone adjustment)
+        6. **Return** transcript + response + sources
+
+        **Supported formats:** MP3, WAV, M4A, FLAC
+
+        **Limits:**
+        - Max file size: 25MB (default)
+        - Max duration: 600 seconds (default)
+
+        **Use cases:**
+        - IVR systems
+        - Voice assistants
+        - Audio question answering
+        - Call center automation
+      operationId: processAudio
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - audio
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: Audio file (MP3, WAV, M4A, FLAC)
+                max_duration:
+                  type: integer
+                  description: Maximum audio duration in seconds (optional override)
+                  example: 300
+      responses:
+        '200':
+          description: Audio processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessResponse'
+              example:
+                success: true
+                request_id: "req-xyz789"
+                transcript: "How do I make a claim?"
+                response: "To make a claim, contact us within 30 days of the incident. You'll need to provide documentation including receipts and medical reports..."
+                confidence: 0.85
+                sources:
+                  - document: "claims-process.md"
+                    chunk_id: "claims-process_0"
+                    relevance: 0.89
+                guardrails:
+                  pii_detected: false
+                  profanity_detected: false
+                  in_scope: true
+                processing_time_ms: 3456
+        '400':
+          description: Bad request (invalid file, too large, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /transcribe:
+    post:
+      tags:
+        - Query
+      summary: Transcribe audio only
+      description: |
+        Transcribe audio file without querying the RAG system.
+
+        **Use cases:**
+        - Testing transcription quality
+        - Speech-to-text only
+        - Debugging audio issues
+        - Getting timestamps
+
+        Returns transcript, segments, duration, and detected language.
+      operationId: transcribeAudio
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - audio
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: Audio file to transcribe
+      responses:
+        '200':
+          description: Transcription successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscribeResponse'
+              example:
+                success: true
+                transcript: "How do I make a claim?"
+                segments:
+                  - start: 0.0
+                    end: 2.5
+                    text: "How do I make a claim?"
+                duration: 2.5
+                language: "en"
+        '500':
+          description: Transcription failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /knowledge/stats:
+    get:
+      tags:
+        - Knowledge Base
+      summary: Get knowledge base statistics
+      description: |
+        Retrieve statistics about the knowledge base:
+        - Total number of documents ingested
+        - Total number of chunks (embeddings)
+        - Embedding model used
+        - Embedding dimensions
+        - Last update timestamp
+
+        **Use cases:**
+        - Monitoring ingestion progress
+        - Verifying documents are loaded
+        - Debugging low confidence issues
+      operationId: knowledgeStats
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeStatsResponse'
+              example:
+                total_documents: 1256
+                total_chunks: 18432
+                embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+                embedding_dimensions: 384
+                last_updated: "2024-02-03T10:30:00Z"
+                documents:
+                  - name: "policy-terms.md"
+                    chunks: 15
+                    ingested_at: "2024-02-03T10:30:00Z"
+        '500':
+          description: Error retrieving statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /knowledge/search:
+    post:
+      tags:
+        - Knowledge Base
+      summary: Search knowledge base
+      description: |
+        Direct semantic search in the knowledge base (bypasses LLM).
+
+        **Use cases:**
+        - Testing vector search
+        - Debugging retrieval issues
+        - Finding relevant documents
+        - Verifying ingestion
+
+        Returns raw chunks with relevance scores.
+      operationId: knowledgeSearch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeSearchRequest'
+            example:
+              query: "love"
+              top_k: 5
+      responses:
+        '200':
+          description: Search successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeSearchResponse'
+              example:
+                results:
+                  - content: "Love is patient, love is kind..."
+                    document: "1Cover-AU-Standard-PDS_20250725.pdf.md"
+                    chunk_id: "1Cover-AU-Standard-PDS_20250725.pdf_0"
+                    relevance: 0.92
+        '500':
+          description: Search failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /knowledge/ingest:
+    post:
+      tags:
+        - Knowledge Base
+      summary: Ingest documents
+      description: |
+        Ingest documents from a folder into the knowledge base.
+
+        **Process:**
+        1. Load documents from specified path (or default `/data/knowledge_base`)
+        2. Split documents into chunks (default: 500 chars, 50 overlap)
+        3. Generate embeddings using sentence-transformers
+        4. Store in ChromaDB vector database
+
+        **Supported formats:** PDF, TXT, MD, DOCX
+
+        **Options:**
+        - `clear_existing`: Remove all existing documents before ingestion
+        - `path`: Custom path to documents (must be accessible to container)
+
+        **Use cases:**
+        - Initial database priming
+        - Adding new documents
+        - Refreshing knowledge base
+        - Testing with different datasets
+      operationId: ingestKnowledge
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                path:
+                  type: string
+                  description: Path to knowledge base folder (defaults to /data/knowledge_base)
+                  example: "/data/knowledge_base"
+                clear_existing:
+                  type: boolean
+                  description: Clear existing documents before ingestion
+                  default: false
+      responses:
+        '200':
+          description: Ingestion successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+              example:
+                success: true
+                ingested:
+                  - name: "policy-terms.md"
+                    chunks: 15
+                  - name: "policy-exclusions.md"
+                    chunks: 12
+                total_chunks_added: 18432
+        '400':
+          description: Bad request (path not found, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ingestion failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /guardrails/check:
+    post:
+      tags:
+        - Guardrails
+      summary: Check text against guardrails
+      description: |
+        Test text against input guardrails without processing through RAG.
+
+        **Checks performed:**
+        - **PII Detection**: Email, phone, SSN, credit card, IP address
+        - **Profanity Filter**: Inappropriate language
+        - **Prompt Injection**: Attempts to override system instructions
+        - **Length Validation**: Max character limit
+
+        **Use cases:**
+        - Testing guardrails
+        - Debugging PII detection
+        - Validating input before processing
+      operationId: checkGuardrails
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuardrailCheckRequest'
+            example:
+              text: "My email is john@example.com and my phone is 555-1234"
+      responses:
+        '200':
+          description: Guardrail check complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GuardrailCheckResponse'
+              example:
+                original: "My email is john@example.com and my phone is 555-1234"
+                sanitized: "My email is [EMAIL] and my phone is [PHONE]"
+                flags:
+                  pii_detected: true
+                  pii_types: ["email", "phone"]
+                  profanity_detected: false
+                  in_scope: true
+                  injection_detected: false
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - components
+        - version
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded]
+          description: Overall system status
+          example: healthy
+        components:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [loaded, connected, not_loaded, not_initialized, disconnected, error]
+          description: Status of each component
+          example:
+            whisper: loaded
+            chromadb: connected
+            ollama: connected
+        version:
+          type: string
+          description: API version
+          example: "1.0.0"
+
+    QueryRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          maxLength: 2000
+          description: Query text
+          example: "What does this insurance policy cover?"
+        conversation_id:
+          type: string
+          description: Optional conversation ID for context (future use)
+          example: "conv-12345"
+
+    SourceInfo:
+      type: object
+      required:
+        - document
+        - chunk_id
+        - relevance
+      properties:
+        document:
+          type: string
+          description: Source document name
+          example: "1Cover-AU-Standard-PDS_20250725.pdf.md"
+        chunk_id:
+          type: string
+          description: Chunk identifier
+          example: "1Cover-AU-Standard-PDS_20250725.pdf_0"
+        relevance:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Relevance score (0-1, higher is better)
+          example: 0.92
+
+    ProcessResponse:
+      type: object
+      required:
+        - success
+        - request_id
+        - response
+        - confidence
+        - processing_time_ms
+      properties:
+        success:
+          type: boolean
+          description: Whether processing succeeded
+          example: true
+        request_id:
+          type: string
+          description: Unique request identifier
+          example: "req-abc123"
+        transcript:
+          type: string
+          description: Transcribed text from audio
+          example: "How do I make a claim?"
+        response:
+          type: string
+          description: Generated response
+          example: "This insurance policy covers medical expenses up to specified limits..."
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Confidence score (0-1)
+          example: 0.85
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceInfo'
+          description: Source documents used
+        guardrails:
+          type: object
+          additionalProperties: true
+          description: Guardrail check results
+          example:
+            pii_detected: false
+            profanity_detected: false
+            in_scope: true
+        processing_time_ms:
+          type: integer
+          description: Total processing time in milliseconds
+          example: 3456
+
+    QueryResponse:
+      type: object
+      required:
+        - success
+        - request_id
+        - response
+        - confidence
+        - fallback_used
+        - processing_time_ms
+      properties:
+        success:
+          type: boolean
+          description: Whether query succeeded
+          example: true
+        request_id:
+          type: string
+          description: Unique request identifier
+          example: "req-abc123"
+        response:
+          type: string
+          description: Generated response
+          example: "This insurance policy covers medical expenses..."
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Confidence score (0-1)
+          example: 0.87
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceInfo'
+          description: Source documents used
+        fallback_used:
+          type: boolean
+          description: Whether fallback response was used (low confidence)
+          example: false
+        processing_time_ms:
+          type: integer
+          description: Total processing time in milliseconds
+          example: 1234
+
+    TranscribeResponse:
+      type: object
+      required:
+        - success
+        - transcript
+        - duration
+        - language
+      properties:
+        success:
+          type: boolean
+          description: Whether transcription succeeded
+          example: true
+        transcript:
+          type: string
+          description: Transcribed text
+          example: "How do I make a claim?"
+        segments:
+          type: array
+          items:
+            type: object
+            properties:
+              start:
+                type: number
+                format: float
+                description: Segment start time in seconds
+              end:
+                type: number
+                format: float
+                description: Segment end time in seconds
+              text:
+                type: string
+                description: Segment text
+          description: Word-level segments with timestamps
+        duration:
+          type: number
+          format: float
+          description: Audio duration in seconds
+          example: 2.5
+        language:
+          type: string
+          description: Detected language code
+          example: "en"
+
+    DocumentInfo:
+      type: object
+      required:
+        - name
+        - chunks
+        - ingested_at
+      properties:
+        name:
+          type: string
+          description: Document filename
+          example: "policy-terms.md"
+        chunks:
+          type: integer
+          description: Number of chunks created from this document
+          example: 15
+        ingested_at:
+          type: string
+          format: date-time
+          description: Ingestion timestamp
+          example: "2024-02-03T10:30:00Z"
+
+    KnowledgeStatsResponse:
+      type: object
+      required:
+        - total_documents
+        - total_chunks
+        - embedding_model
+        - embedding_dimensions
+      properties:
+        total_documents:
+          type: integer
+          description: Total number of documents in knowledge base
+          example: 1256
+        total_chunks:
+          type: integer
+          description: Total number of chunks (embeddings)
+          example: 18432
+        embedding_model:
+          type: string
+          description: Embedding model name
+          example: "sentence-transformers/all-MiniLM-L6-v2"
+        embedding_dimensions:
+          type: integer
+          description: Embedding vector dimensions
+          example: 384
+        last_updated:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2024-02-03T10:30:00Z"
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentInfo'
+          description: List of ingested documents
+
+    KnowledgeSearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Search query
+          example: "love"
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+          description: Number of results to return
+          example: 5
+
+    SearchResult:
+      type: object
+      required:
+        - content
+        - document
+        - chunk_id
+        - relevance
+      properties:
+        content:
+          type: string
+          description: Chunk content
+          example: "Love is patient, love is kind. It does not envy..."
+        document:
+          type: string
+          description: Source document
+          example: "1Cover-AU-Standard-PDS_20250725.pdf.md"
+        chunk_id:
+          type: string
+          description: Chunk identifier
+          example: "1Cover-AU-Standard-PDS_20250725.pdf_0"
+        relevance:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Relevance score
+          example: 0.92
+
+    KnowledgeSearchResponse:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+          description: Search results ordered by relevance
+
+    IngestResponse:
+      type: object
+      required:
+        - success
+        - ingested
+        - total_chunks_added
+      properties:
+        success:
+          type: boolean
+          description: Whether ingestion succeeded
+          example: true
+        ingested:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: Document name
+              chunks:
+                type: integer
+                description: Number of chunks created
+          description: List of ingested documents
+        total_chunks_added:
+          type: integer
+          description: Total chunks created and added
+          example: 18432
+
+    GuardrailCheckRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          maxLength: 5000
+          description: Text to check against guardrails
+          example: "My email is john@example.com"
+
+    GuardrailCheckResponse:
+      type: object
+      required:
+        - original
+        - sanitized
+        - flags
+      properties:
+        original:
+          type: string
+          description: Original text
+          example: "My email is john@example.com"
+        sanitized:
+          type: string
+          description: Sanitized text (PII redacted)
+          example: "My email is [EMAIL]"
+        flags:
+          type: object
+          additionalProperties: true
+          description: Guardrail detection flags
+          properties:
+            pii_detected:
+              type: boolean
+            pii_types:
+              type: array
+              items:
+                type: string
+            profanity_detected:
+              type: boolean
+            in_scope:
+              type: boolean
+            injection_detected:
+              type: boolean
+          example:
+            pii_detected: true
+            pii_types: ["email"]
+            profanity_detected: false
+            in_scope: true
+            injection_detected: false
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+        - error_code
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+          description: Always false for errors
+        error:
+          type: string
+          description: Error message
+          example: "Audio file too large"
+        error_code:
+          type: string
+          description: Machine-readable error code
+          example: "FILE_TOO_LARGE"
+        request_id:
+          type: string
+          description: Request ID if available
+          example: "req-abc123"
