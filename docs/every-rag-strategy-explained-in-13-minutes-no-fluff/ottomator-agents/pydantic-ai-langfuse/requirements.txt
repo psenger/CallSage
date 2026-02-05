@@ -49,7 +49,7 @@ opentelemetry-sdk==1.32.1
 opentelemetry-semantic-conventions==0.53b1
 packaging==24.2
 prompt_toolkit==3.0.50
-protobuf==5.29.4
+protobuf==5.29.6
 pyasn1==0.6.1
 pyasn1_modules==0.4.2
 pydantic==2.11.1
