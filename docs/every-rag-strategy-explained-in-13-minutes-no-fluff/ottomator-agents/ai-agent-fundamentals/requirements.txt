@@ -89,7 +89,7 @@ pydantic==2.12.3
     #   openai
     #   pydantic-ai-slim
     #   pydantic-graph
-pydantic-ai-slim==1.7.0
+pydantic-ai-slim==1.56.0
     # via simple-pydantic-agent (pyproject.toml)
 pydantic-core==2.41.4
     # via pydantic
