@@ -93,7 +93,7 @@ opentelemetry-sdk==1.29.0
 opentelemetry-semantic-conventions==0.50b0
 packaging==24.2
 pandas==2.2.3
-pillow==10.4.0
+pillow==12.1.1
 postgrest==0.19.3
 propcache==0.2.1
 protobuf==5.29.3
