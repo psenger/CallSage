@@ -97,7 +97,7 @@ pydantic-graph==1.7.0
     # via pydantic-ai-slim
 python-dotenv==1.2.1
     # via simple-pydantic-agent (pyproject.toml)
-requests==2.32.5
+requests==2.33.0
     # via
     #   langfuse
     #   opentelemetry-exporter-otlp-proto-http
