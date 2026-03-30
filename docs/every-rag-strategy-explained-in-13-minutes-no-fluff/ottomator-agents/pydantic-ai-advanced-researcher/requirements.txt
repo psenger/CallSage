@@ -56,7 +56,7 @@ pydantic-ai==0.0.10
 pydantic-ai-slim==0.0.10
 pydantic_core==2.27.1
 pydeck==0.9.1
-Pygments==2.18.0
+Pygments==2.20.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 pytz==2024.2
