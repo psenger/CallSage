@@ -95,7 +95,7 @@ orjson==3.10.12
 overrides==7.7.0
 packaging==24.2
 pandas==2.2.3
-pillow==11.0.0
+pillow==12.2.0
 postgrest==0.19.1
 posthog==3.7.4
 propcache==0.2.1
