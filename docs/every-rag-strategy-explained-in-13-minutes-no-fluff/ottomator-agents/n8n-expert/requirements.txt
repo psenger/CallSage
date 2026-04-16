@@ -32,7 +32,7 @@ langchain-anthropic==0.2.3
 langchain-core==0.3.11
 langchain-openai==0.2.2
 langchain-text-splitters==0.3.0
-langsmith==0.1.135
+langsmith==0.7.31
 multidict==6.1.0
 numpy==1.26.4
 openai==1.51.2
