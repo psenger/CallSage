@@ -80,7 +80,7 @@ mypy-extensions==1.0.0
 narwhals==1.24.1
 nest-asyncio==1.6.0
 networkx==3.4.2
-nltk==3.9.1
+nltk==3.9.4
 numpy==2.2.2
 ollama==0.4.7
 openai==1.60.2
