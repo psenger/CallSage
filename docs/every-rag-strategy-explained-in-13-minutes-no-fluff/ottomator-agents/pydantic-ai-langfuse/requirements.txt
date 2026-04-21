@@ -60,7 +60,7 @@ pydantic-settings==2.8.1
 pydantic_core==2.33.0
 Pygments==2.19.1
 python-dateutil==2.9.0.post0
-python-dotenv==1.1.0
+python-dotenv==1.2.2
 PyYAML==6.0.2
 requests==2.32.3
 rich==14.0.0
