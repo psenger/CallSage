@@ -5,6 +5,6 @@ description = "A simple Pydantic AI agent demonstrating fundamentals"
 requires-python = ">=3.10"
 dependencies = [
     "pydantic-ai-slim[openai]>=0.0.14",
-    "python-dotenv>=1.0.0",
+    "python-dotenv>=1.2.2",
     "langfuse>=2.0.0",
 ]
