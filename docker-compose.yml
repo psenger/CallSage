@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # Main Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ivr-rag-app
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./data/audio:/data/audio
+      - ./data/knowledge_base:/data/knowledge_base
+      - chroma_data:/data/chroma
+      - whisper_cache:/root/.cache/huggingface
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - .env
+    depends_on:
+      ollama:
+        condition: service_started
+      chroma:
+        condition: service_started
+    networks:
+      - ivr-network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Ollama LLM Server
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ivr-rag-ollama
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    networks:
+      - ivr-network
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+    # Uncomment for GPU support
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # Ollama Model Puller (runs once to download model)
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: ivr-rag-ollama-pull
+    depends_on:
+      - ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sleep 10
+        ollama pull mistral
+        echo "Model pull complete!"
+    networks:
+      - ivr-network
+    restart: "no"
+
+  # ChromaDB Vector Store
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: ivr-rag-chroma
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    networks:
+      - ivr-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  ivr-network:
+    driver: bridge
+
+volumes:
+  ollama_data:
+    name: ivr-ollama-data
+  chroma_data:
+    name: ivr-chroma-data
+  whisper_cache:
+    name: ivr-whisper-cache
