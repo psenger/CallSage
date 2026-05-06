@@ -183,7 +183,7 @@ def main():
         test_chat(query)
 
     # Test 4: Audio Processing (if audio file exists)
-    audio_files = list(Path("/Users/psenger/Developer/CallSage/data/audio").glob("*.mp3"))
+    audio_files = list(Path("data/audio").glob("*.mp3"))
     if audio_files:
         test_audio(str(audio_files[0]))
     else:

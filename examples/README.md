@@ -120,7 +120,7 @@ import { QueryService } from './api/services/QueryService';
 ### 1. Start the API
 
 ```bash
-cd /Users/psenger/Developer/CallSage
+cd /path/to/CallSage
 make start
 make ingest-insurance documentation  # Prime the database
 ```

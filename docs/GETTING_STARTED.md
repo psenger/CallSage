@@ -21,7 +21,7 @@ Simple guide to get CallSage running in 5 minutes.
 ### Step 1: Start the System
 
 ```bash
-cd /Users/psenger/Developer/CallSage
+cd /path/to/CallSage
 make start
 ```
 
