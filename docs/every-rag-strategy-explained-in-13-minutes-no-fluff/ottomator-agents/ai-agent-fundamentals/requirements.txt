@@ -123,7 +123,7 @@ typing-inspection==0.4.2
     #   pydantic
     #   pydantic-ai-slim
     #   pydantic-graph
-urllib3==2.5.0
+urllib3==2.7.0
     # via requests
 wrapt==1.17.3
     # via langfuse
