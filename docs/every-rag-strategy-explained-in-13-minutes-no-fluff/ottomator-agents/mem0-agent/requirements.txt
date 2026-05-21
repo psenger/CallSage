@@ -56,7 +56,7 @@ logfire-api==3.7.1
 markdown-it-py==3.0.0
 MarkupSafe==3.0.2
 mdurl==0.1.2
-mem0ai==0.1.65
+mem0ai==2.0.0b2
 mistralai==1.5.0
 monotonic==1.6
 multidict==6.1.0
