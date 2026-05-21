@@ -15,7 +15,7 @@ distro==1.9.0
 eval_type_backport==0.2.0
 executing==2.1.0
 gitdb==4.0.11
-GitPython==3.1.43
+GitPython==3.1.50
 google-auth==2.36.0
 googleapis-common-protos==1.66.0
 griffe==1.5.1
